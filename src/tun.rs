@@ -69,6 +69,7 @@ impl Tun {
         if ret < 0 {
             return Err(ErrorKind::Create(io::Error::last_os_error()))?;
         }
+        set_nonblock(&tun).map_err(ErrorKind::Create)?;
         let mio = unsafe { mio_wrapper::Tun::from_raw_fd(tun.into_raw_fd()) };
         let inner = PollEvented::new(mio,handle)
                 // Why From doesn't work here?
@@ -95,4 +96,15 @@ impl io::Write for Tun {
 }
 
 impl Io for Tun {
+}
+
+pub fn set_nonblock(s: &AsRawFd) -> io::Result<()> {
+    let ret = unsafe {
+        libc::fcntl(s.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK)
+    };
+    if ret < 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
 }
