@@ -1,8 +1,12 @@
 use std::io;
 use std::fs;
 use std::os::unix::io::AsRawFd;
+use std::os::unix::io::{FromRawFd, IntoRawFd};
 
 use libc;
+use tokio_core::reactor::{PollEvented, Handle};
+use tokio_core::io::Io;
+use mio_wrapper;
 
 error_chain! {
     errors {
@@ -17,6 +21,7 @@ error_chain! {
             description("Error while creating the device")
             display(me) -> ("{}: {}", me.description(), code)
             cause(code)
+            from()
         }
     }
 }
@@ -36,12 +41,13 @@ mod linux {
 }
 
 pub struct Tun {
+    // TODO(tailhook) Why we need a name here?
     pub name: String,
-    pub file: fs::File,
+    inner: PollEvented<mio_wrapper::Tun>,
 }
 
 impl Tun {
-    pub fn new(name: &str) -> Result<Tun> {
+    pub fn new(name: &str, handle: &Handle) -> Result<Tun> {
         if name.as_bytes().len() >= 16 {
             Err(ErrorKind::NameTooLong(name.as_bytes().len()))?;
         }
@@ -61,11 +67,32 @@ impl Tun {
             linux::tun_create(tun.as_raw_fd(), &params as *const _ as *const libc::c_void as *const i32)
         };
         if ret < 0 {
-            Err(ErrorKind::Create(io::Error::last_os_error()))?;
+            return Err(ErrorKind::Create(io::Error::last_os_error()))?;
         }
+        let mio = unsafe { mio_wrapper::Tun::from_raw_fd(tun.into_raw_fd()) };
+        let inner = PollEvented::new(mio,handle)
+                // Why From doesn't work here?
+                .map_err(ErrorKind::Create)?;
         Ok(Tun {
             name: name.into(),
-            file: tun,
+            inner: inner,
         })
     }
+}
+
+impl io::Read for Tun {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.read(buf)
+    }
+}
+impl io::Write for Tun {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.inner.write(buf)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl Io for Tun {
 }
