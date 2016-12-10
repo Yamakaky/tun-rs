@@ -17,11 +17,8 @@ error_chain! {
         Open {
             description("Error while opening the device")
         }
-        Create(code: io::Error) {
+        Create {
             description("Error while creating the device")
-            display(me) -> ("{}: {}", me.description(), code)
-            cause(code)
-            from()
         }
     }
 }
@@ -67,13 +64,11 @@ impl Tun {
             linux::tun_create(tun.as_raw_fd(), &params as *const _ as *const libc::c_void as *const i32)
         };
         if ret < 0 {
-            return Err(ErrorKind::Create(io::Error::last_os_error()))?;
+            Err(io::Error::last_os_error()).chain_err(|| ErrorKind::Create)?;
         }
-        set_nonblock(&tun).map_err(ErrorKind::Create)?;
+        set_nonblock(&tun).chain_err(|| ErrorKind::Create)?;
         let mio = unsafe { mio_wrapper::Tun::from_raw_fd(tun.into_raw_fd()) };
-        let inner = PollEvented::new(mio,handle)
-                // Why From doesn't work here?
-                .map_err(ErrorKind::Create)?;
+        let inner = PollEvented::new(mio,handle).chain_err(|| ErrorKind::Create)?;
         Ok(Tun {
             name: name.into(),
             inner: inner,
