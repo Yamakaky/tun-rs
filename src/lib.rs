@@ -9,6 +9,7 @@ extern crate libc;
 extern crate mio;
 extern crate tokio_core;
 
-pub mod datagram_framed;
-pub mod tun;
-pub mod mio_wrapper;
+mod tun;
+mod mio_wrapper;
+
+pub use tun::*;

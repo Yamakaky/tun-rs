@@ -107,7 +107,6 @@ impl Tun {
                      IpAddr::V4(Ipv4Addr::new(10, 9, 3, 2)),
                      IpAddr::V4(Ipv4Addr::new(255, 255, 255, 0)))?;
         Self::set_up(params.name)?;
-        //set_nonblock(&tun).chain_err(|| ErrorKind::Create)?;
         let mio = unsafe { mio_wrapper::Tun::from_raw_fd(tun.into_raw_fd()) };
         let inner = PollEvented::new(mio,handle).chain_err(|| ErrorKind::Create)?;
         Ok(Tun {
