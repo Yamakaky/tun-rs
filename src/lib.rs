@@ -2,6 +2,7 @@
 extern crate bitflags;
 #[macro_use]
 extern crate error_chain;
+extern crate futures;
 #[macro_use]
 extern crate ioctl;
 extern crate libc;

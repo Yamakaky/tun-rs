@@ -24,7 +24,7 @@ pub fn real_main() -> Result<()> {
     let mut core = reactor::Core::new()?;
     let tun = tun::tun::Tun::new("pote", &core.handle())?;
     let stream = tun.framed(tun::datagram_framed::Parser).and_then(|msg| {
-        println!("{}", msg.len());
+        println!("Received {} bytes", msg.len());
         Ok(())
     }).for_each(|_| {
         Ok(())

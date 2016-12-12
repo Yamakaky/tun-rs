@@ -11,7 +11,7 @@ impl Codec for Parser {
     type Out = Vec<u8>;
 
     fn decode(&mut self, buf: &mut EasyBuf) -> io::Result<Option<Vec<u8>>> {
-        Ok(Some(buf.as_slice().into()))
+        Ok(Some(buf.split_off(0).as_slice().into()))
     }
 
     fn encode(&mut self, msg: Vec<u8>, buf: &mut Vec<u8>) -> io::Result<()> {

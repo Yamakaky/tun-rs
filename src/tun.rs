@@ -4,6 +4,7 @@ use std::net::*;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 
+use futures::Async;
 use libc;
 use tokio_core::reactor::{PollEvented, Handle};
 use tokio_core::io::Io;
@@ -106,7 +107,7 @@ impl Tun {
                      IpAddr::V4(Ipv4Addr::new(10, 9, 3, 2)),
                      IpAddr::V4(Ipv4Addr::new(255, 255, 255, 0)))?;
         Self::set_up(params.name)?;
-        set_nonblock(&tun).chain_err(|| ErrorKind::Create)?;
+        //set_nonblock(&tun).chain_err(|| ErrorKind::Create)?;
         let mio = unsafe { mio_wrapper::Tun::from_raw_fd(tun.into_raw_fd()) };
         let inner = PollEvented::new(mio,handle).chain_err(|| ErrorKind::Create)?;
         Ok(Tun {
@@ -208,15 +209,11 @@ impl io::Write for Tun {
 }
 
 impl Io for Tun {
-}
+    fn poll_read(&mut self) -> Async<()> {
+        self.inner.poll_read()
+    }
 
-pub fn set_nonblock(s: &AsRawFd) -> io::Result<()> {
-    let ret = unsafe {
-        libc::fcntl(s.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK)
-    };
-    if ret < 0 {
-        Err(io::Error::last_os_error())
-    } else {
-        Ok(())
+    fn poll_write(&mut self) -> Async<()> {
+        self.inner.poll_write()
     }
 }
