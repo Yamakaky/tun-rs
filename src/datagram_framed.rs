@@ -30,7 +30,7 @@ impl UdpCodec for Parser {
 
     fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> SocketAddr {
         let (addr, data) = msg;
-        buf.extend(data);
+        buf.extend(data.into_iter());
         addr
     }
 }
