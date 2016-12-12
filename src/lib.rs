@@ -9,6 +9,7 @@ extern crate libc;
 extern crate mio;
 extern crate tokio_core;
 
+mod ffi;
 mod tun;
 mod mio_wrapper;
 
