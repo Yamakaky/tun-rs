@@ -64,12 +64,12 @@ impl Tun {
                                     as *const i32) as isize
         }).chain_err(|| ErrorKind::Create)?;
 
-        Self::add_ip(params.name,
-                     IpAddr::V4(Ipv4Addr::new(10, 9, 3, 2)),
-                     IpAddr::V4(Ipv4Addr::new(255, 255, 255, 0)))?;
-        Self::add_ip(params.name,
-                     IpAddr::V6(Ipv6Addr::new(10, 9, 3, 2, 0, 0, 0, 0)),
-                     IpAddr::V6(Ipv6Addr::new(255, 255, 255, 0, 0, 0, 0, 0)))?;
+        Self::add_ip4(params.name,
+                      Ipv4Addr::new(10, 9, 3, 2),
+                      Ipv4Addr::new(255, 255, 255, 0))?;
+        Self::add_ip6(params.name,
+                      Ipv6Addr::new(10, 9, 3, 2, 0, 0, 0, 0),
+                      64)?;
         Self::set_up(params.name)?;
         set_nonblock(&tun).chain_err(|| ErrorKind::Create)?;
         let mio = unsafe { mio_wrapper::Tun::from_raw_fd(tun.into_raw_fd()) };
@@ -78,14 +78,6 @@ impl Tun {
             _name: name,
             inner: inner,
         })
-    }
-
-    fn add_ip(name: [i8; 16], ip: IpAddr, mask: IpAddr) -> Result<()> {
-        match (ip, mask) {
-            (IpAddr::V4(ip), IpAddr::V4(mask)) => Self::add_ip4(name, ip, mask),
-            (IpAddr::V6(ip), IpAddr::V6(mask)) => Self::add_ip6(name, ip, mask),
-            _ => unimplemented!(),
-        }
     }
 
     fn add_ip4(name: [i8; 16], ip: Ipv4Addr, mask: Ipv4Addr) -> Result<()> {
@@ -115,7 +107,7 @@ impl Tun {
         Ok(())
     }
 
-    fn add_ip6(name: [i8; 16], ip: Ipv6Addr, _mask: Ipv6Addr) -> Result<()> {
+    fn add_ip6(name: [i8; 16], ip: Ipv6Addr, prefixlen: u32) -> Result<()> {
         let socket = unsafe { UdpSocket::from_raw_fd(
             libc::socket(libc::AF_INET6, libc::SOCK_DGRAM, 0)
         ) };
@@ -133,7 +125,7 @@ impl Tun {
 
         let mut param = ffi::in6_ifreq {
             addr: ffi::addr6_to_raw(ip),
-            prefixlen: 64,
+            prefixlen: prefixlen,
             ifindex: param.data,
         };
         ffi::check_ret(unsafe {
