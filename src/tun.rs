@@ -72,24 +72,67 @@ impl Tun {
         })
     }
 
-    pub fn add_ip(name: [i8; 16], ip: IpAddr, mask: IpAddr) -> Result<()> {
-        let socket = UdpSocket::bind("0.0.0.0:6555").chain_err(|| ErrorKind::AddIp)?;
+    fn add_ip(name: [i8; 16], ip: IpAddr, mask: IpAddr) -> Result<()> {
+        match (ip, mask) {
+            (IpAddr::V4(ip), IpAddr::V4(mask)) =>
+                Self::add_ip4(name, ip, mask),
+            (IpAddr::V6(ip), IpAddr::V6(mask)) =>
+                Self::add_ip6(name, ip, mask),
+            _ => unimplemented!(),
+        }
+    }
+
+    fn add_ip4(name: [i8; 16], ip: Ipv4Addr, mask: Ipv4Addr) -> Result<()> {
+        let socket = unsafe { UdpSocket::from_raw_fd(
+            libc::socket(libc::AF_INET, libc::SOCK_DGRAM, 0)
+        ) };
         let mut param = ffi::ifreq {
             name: name,
-            data: ffi::addr_to_raw(ip),
+            data: ffi::addr4_to_raw(ip),
         };
         let ret = unsafe {
-            ffi::add_ip(socket.as_raw_fd(), &mut param as *mut _ as *mut libc::c_void as *mut u8)
+            ffi::add_ip(socket.as_raw_fd(),
+                        &mut param as *mut _ as *mut libc::c_void as *mut u8)
         };
         if ret < 0 {
             Err(io::Error::last_os_error()).chain_err(|| ErrorKind::AddIp)?;
         }
         let mut param = ffi::ifreq {
             name: name,
-            data: ffi::addr_to_raw(mask),
+            data: ffi::addr4_to_raw(mask),
         };
         let ret = unsafe {
-            ffi::add_mask(socket.as_raw_fd(), &mut param as *mut _ as *mut libc::c_void as *mut u8)
+            ffi::add_mask(socket.as_raw_fd(),
+                          &mut param as *mut _ as *mut libc::c_void as *mut u8)
+        };
+        if ret < 0 {
+            Err(io::Error::last_os_error()).chain_err(|| ErrorKind::AddIp)?;
+        }
+        Ok(())
+    }
+
+    fn add_ip6(name: [i8; 16], ip: Ipv6Addr, mask: Ipv6Addr) -> Result<()> {
+        let socket = unsafe { UdpSocket::from_raw_fd(
+            libc::socket(libc::AF_INET6, libc::SOCK_DGRAM, 0)
+        ) };
+        let mut param = ffi::ifreq {
+            name: name,
+            data: ffi::addr6_to_raw(ip),
+        };
+        let ret = unsafe {
+            ffi::add_ip(socket.as_raw_fd(),
+                        &mut param as *mut _ as *mut libc::c_void as *mut u8)
+        };
+        if ret < 0 {
+            Err(io::Error::last_os_error()).chain_err(|| ErrorKind::AddIp)?;
+        }
+        let mut param = ffi::ifreq {
+            name: name,
+            data: ffi::addr6_to_raw(mask),
+        };
+        let ret = unsafe {
+            ffi::add_mask(socket.as_raw_fd(),
+                          &mut param as *mut _ as *mut libc::c_void as *mut u8)
         };
         if ret < 0 {
             Err(io::Error::last_os_error()).chain_err(|| ErrorKind::AddIp)?;

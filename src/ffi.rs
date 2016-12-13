@@ -44,39 +44,32 @@ bitflags! {
     }
 }
 
-pub fn addr_to_raw(addr: IpAddr) -> libc::sockaddr {
-    use std::mem::transmute;
-    unsafe {
-        match addr {
-            IpAddr::V4(v4) => {
-                transmute(libc::sockaddr_in {
-                    sin_family: libc::AF_INET as libc::sa_family_t,
-                    sin_addr: libc::in_addr {
-                        s_addr: {
-                            let bytes = v4.octets();
-                            (bytes[3] as u32) << 24 |
-                                (bytes[2] as u32) << 16 |
-                                (bytes[1] as u32) << 8 |
-                                (bytes[0] as u32)
-                        }
-                    },
-                    sin_port: 0,
-                    sin_zero: [0; 8],
-                })
+pub fn addr4_to_raw(addr: Ipv4Addr) -> libc::sockaddr_in {
+    libc::sockaddr_in {
+        sin_family: libc::AF_INET as libc::sa_family_t,
+        sin_addr: libc::in_addr {
+            s_addr: {
+                let bytes = addr.octets();
+                (bytes[3] as u32) << 24 |
+                    (bytes[2] as u32) << 16 |
+                    (bytes[1] as u32) << 8 |
+                    (bytes[0] as u32)
             }
-            IpAddr::V6(_v6) => {
-                unimplemented!()
-                    //transmute(libc::sockaddr_in6 {
-                    //    sin6_family: libc::AF_INET6 as libc::sa_family_t,
-                    //    sin6_addr: libc::in6_addr {
-                    //        s6_addr: v6.octets(),
-                    //        __align: [],
-                    //    },
-                    //    sin6_port: 0,
-                    //    sin6_flowinfo: 0,
-                    //    sin6_scope_id: 0,
-                    //})
-            }
-        }
+        },
+        sin_port: 0,
+        sin_zero: [0; 8],
+    }
+}
+pub fn addr6_to_raw(addr: Ipv6Addr) -> libc::sockaddr_in6 {
+    libc::sockaddr_in6 {
+        sin6_family: libc::AF_INET6 as libc::sa_family_t,
+        sin6_addr: {
+            let mut ip: libc::in6_addr = unsafe { ::std::mem::zeroed() };
+            ip.s6_addr = addr.octets();
+            ip
+        },
+        sin6_port: 0,
+        sin6_flowinfo: 0,
+        sin6_scope_id: 0,
     }
 }
