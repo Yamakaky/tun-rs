@@ -32,15 +32,13 @@ error_chain! {
 
 pub struct Tun {
     // TODO(tailhook) Why we need a name here?
-    pub name: String,
+    pub name: Option<String>,
     inner: PollEvented<mio_wrapper::Tun>,
 }
 
 impl Tun {
-    pub fn new(name: &str, handle: &Handle) -> Result<Tun> {
-        if name.as_bytes().len() >= 16 {
-            Err(ErrorKind::NameTooLong(name.as_bytes().len()))?;
-        }
+    pub fn new<S: Into<Option<String>>>(name: S, handle: &Handle) -> Result<Tun> {
+        let name = name.into();
         let tun = fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -50,8 +48,13 @@ impl Tun {
             name: [0; 16],
             data: ffi::IFF_TUN,
         };
-        for (from, to) in name.as_bytes().iter().zip(params.name.iter_mut()) {
-            *to = *from as libc::c_schar;
+        if let Some(ref name) = name {
+            if name.as_bytes().len() >= 16 {
+                Err(ErrorKind::NameTooLong(name.as_bytes().len()))?;
+            }
+            for (from, to) in name.as_bytes().iter().zip(params.name.iter_mut()) {
+                *to = *from as libc::c_schar;
+            }
         }
         let ret = unsafe {
             ffi::tun_create(tun.as_raw_fd(), &params as *const _ as *const libc::c_void as *const i32)
@@ -67,7 +70,7 @@ impl Tun {
         let mio = unsafe { mio_wrapper::Tun::from_raw_fd(tun.into_raw_fd()) };
         let inner = PollEvented::new(mio,handle).chain_err(|| ErrorKind::Create)?;
         Ok(Tun {
-            name: name.into(),
+            name: name,
             inner: inner,
         })
     }

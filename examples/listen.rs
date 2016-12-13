@@ -57,7 +57,8 @@ pub const DEFAULT_PORT: u16 = 18424;
 
 pub fn real_main() -> Result<()> {
     let mut core = reactor::Core::new()?;
-    let tun = tun::Tun::new("pote", &core.handle())?;
+    let tun = tun::Tun::new(None, &core.handle())?;
+    //let tun = tun::Tun::new(String::from("name"), &core.handle())?;
     Ok(core.run(Server {
         tun: tun
     })?)
