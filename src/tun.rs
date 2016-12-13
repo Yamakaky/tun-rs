@@ -67,6 +67,9 @@ impl Tun {
         Self::add_ip(params.name,
                      IpAddr::V4(Ipv4Addr::new(10, 9, 3, 2)),
                      IpAddr::V4(Ipv4Addr::new(255, 255, 255, 0)))?;
+        Self::add_ip(params.name,
+                     IpAddr::V6(Ipv6Addr::new(10, 9, 3, 2, 0, 0, 0, 0)),
+                     IpAddr::V6(Ipv6Addr::new(255, 255, 255, 0, 0, 0, 0, 0)))?;
         Self::set_up(params.name)?;
         set_nonblock(&tun).chain_err(|| ErrorKind::Create)?;
         let mio = unsafe { mio_wrapper::Tun::from_raw_fd(tun.into_raw_fd()) };
@@ -101,12 +104,9 @@ impl Tun {
                                      as *mut u8) as isize
         }).chain_err(|| ErrorKind::AddIp)?;
 
-        let mut param = ffi::ifreq {
-            name: name,
-            data: ffi::addr4_to_raw(mask),
-        };
+        param.data = ffi::addr4_to_raw(mask);
         ffi::check_ret(unsafe {
-            ffi::add_ip(socket.as_raw_fd(),
+            ffi::add_mask(socket.as_raw_fd(),
                           &mut param as *mut _
                                      as *mut libc::c_void
                                      as *mut u8) as isize
@@ -115,28 +115,29 @@ impl Tun {
         Ok(())
     }
 
-    fn add_ip6(name: [i8; 16], ip: Ipv6Addr, mask: Ipv6Addr) -> Result<()> {
+    fn add_ip6(name: [i8; 16], ip: Ipv6Addr, _mask: Ipv6Addr) -> Result<()> {
         let socket = unsafe { UdpSocket::from_raw_fd(
             libc::socket(libc::AF_INET6, libc::SOCK_DGRAM, 0)
         ) };
 
-        let mut param = ffi::ifreq {
+        let mut param = ffi::ifreq::<libc::c_int> {
             name: name,
-            data: ffi::addr6_to_raw(ip),
+            data: 0,
+        };
+        ffi::check_ret(unsafe {
+            ffi::get_interface_index(socket.as_raw_fd(),
+                                     &mut param as *mut _
+                                                as *mut libc::c_void
+                                                as *mut u8) as isize
+        }).chain_err(|| ErrorKind::AddIp)?;
+
+        let mut param = ffi::in6_ifreq {
+            addr: ffi::addr6_to_raw(ip),
+            prefixlen: 64,
+            ifindex: param.data,
         };
         ffi::check_ret(unsafe {
             ffi::add_ip(socket.as_raw_fd(),
-                          &mut param as *mut _
-                                     as *mut libc::c_void
-                                     as *mut u8) as isize
-        }).chain_err(|| ErrorKind::AddIp)?;
-
-        let mut param = ffi::ifreq {
-            name: name,
-            data: ffi::addr6_to_raw(mask),
-        };
-        ffi::check_ret(unsafe {
-            ffi::add_mask(socket.as_raw_fd(),
                           &mut param as *mut _
                                      as *mut libc::c_void
                                      as *mut u8) as isize

@@ -7,15 +7,23 @@ ioctl!(write tun_create with b'T', 202; libc::c_int);
 ioctl!(bad add_ip with SIOCSIFADDR);
 ioctl!(bad add_mask with SIOCSIFNETMASK);
 ioctl!(bad set_flags with SIOCSIFFLAGS);
+ioctl!(bad get_interface_index with SIOCGIFINDEX);
 
 #[repr(C)]
 pub struct ifreq<T> {
     pub name: [libc::c_char; 16],
     pub data: T,
 }
+#[repr(C)]
+pub struct in6_ifreq {
+    pub addr: libc::in6_addr,
+    pub prefixlen: u32,
+    pub ifindex: libc::c_int,
+}
 pub const SIOCSIFADDR: libc::c_ushort = 0x8916;
 pub const SIOCSIFNETMASK: libc::c_ushort = 0x891c;
 pub const SIOCSIFFLAGS: libc::c_ushort = 0x8914;
+pub const SIOCGIFINDEX: libc::c_ushort = 0x8933;
 pub const IFF_TUN: libc::c_short = 0x0001;
 
 bitflags! {
@@ -61,18 +69,10 @@ pub fn addr4_to_raw(addr: Ipv4Addr) -> libc::sockaddr_in {
         sin_zero: [0; 8],
     }
 }
-pub fn addr6_to_raw(addr: Ipv6Addr) -> libc::sockaddr_in6 {
-    libc::sockaddr_in6 {
-        sin6_family: libc::AF_INET6 as libc::sa_family_t,
-        sin6_addr: {
-            let mut ip: libc::in6_addr = unsafe { ::std::mem::zeroed() };
-            ip.s6_addr = addr.octets();
-            ip
-        },
-        sin6_port: 0,
-        sin6_flowinfo: 0,
-        sin6_scope_id: 0,
-    }
+pub fn addr6_to_raw(addr: Ipv6Addr) -> libc::in6_addr {
+    let mut ip: libc::in6_addr = unsafe { ::std::mem::zeroed() };
+    ip.s6_addr = addr.octets();
+    ip
 }
 
 pub fn check_ret(ret: libc::ssize_t) -> io::Result<usize> {
