@@ -44,6 +44,7 @@ impl Tun {
             .write(true)
             .open("/dev/net/tun")
             .chain_err(|| ErrorKind::Open)?;
+
         let mut params = ffi::ifreq::<libc::c_short> {
             name: [0; 16],
             data: ffi::IFF_TUN,
@@ -56,12 +57,13 @@ impl Tun {
                 *to = *from as libc::c_schar;
             }
         }
-        let ret = unsafe {
-            ffi::tun_create(tun.as_raw_fd(), &params as *const _ as *const libc::c_void as *const i32)
-        };
-        if ret < 0 {
-            Err(io::Error::last_os_error()).chain_err(|| ErrorKind::Create)?;
-        }
+        ffi::check_ret(unsafe {
+            ffi::tun_create(tun.as_raw_fd(),
+                            &params as *const _
+                                    as *const libc::c_void
+                                    as *const i32) as isize
+        }).chain_err(|| ErrorKind::Create)?;
+
         Self::add_ip(params.name,
                      IpAddr::V4(Ipv4Addr::new(10, 9, 3, 2)),
                      IpAddr::V4(Ipv4Addr::new(255, 255, 255, 0)))?;
@@ -77,10 +79,8 @@ impl Tun {
 
     fn add_ip(name: [i8; 16], ip: IpAddr, mask: IpAddr) -> Result<()> {
         match (ip, mask) {
-            (IpAddr::V4(ip), IpAddr::V4(mask)) =>
-                Self::add_ip4(name, ip, mask),
-            (IpAddr::V6(ip), IpAddr::V6(mask)) =>
-                Self::add_ip6(name, ip, mask),
+            (IpAddr::V4(ip), IpAddr::V4(mask)) => Self::add_ip4(name, ip, mask),
+            (IpAddr::V6(ip), IpAddr::V6(mask)) => Self::add_ip6(name, ip, mask),
             _ => unimplemented!(),
         }
     }
@@ -89,28 +89,29 @@ impl Tun {
         let socket = unsafe { UdpSocket::from_raw_fd(
             libc::socket(libc::AF_INET, libc::SOCK_DGRAM, 0)
         ) };
+
         let mut param = ffi::ifreq {
             name: name,
             data: ffi::addr4_to_raw(ip),
         };
-        let ret = unsafe {
+        ffi::check_ret(unsafe {
             ffi::add_ip(socket.as_raw_fd(),
-                        &mut param as *mut _ as *mut libc::c_void as *mut u8)
-        };
-        if ret < 0 {
-            Err(io::Error::last_os_error()).chain_err(|| ErrorKind::AddIp)?;
-        }
+                          &mut param as *mut _
+                                     as *mut libc::c_void
+                                     as *mut u8) as isize
+        }).chain_err(|| ErrorKind::AddIp)?;
+
         let mut param = ffi::ifreq {
             name: name,
             data: ffi::addr4_to_raw(mask),
         };
-        let ret = unsafe {
-            ffi::add_mask(socket.as_raw_fd(),
-                          &mut param as *mut _ as *mut libc::c_void as *mut u8)
-        };
-        if ret < 0 {
-            Err(io::Error::last_os_error()).chain_err(|| ErrorKind::AddIp)?;
-        }
+        ffi::check_ret(unsafe {
+            ffi::add_ip(socket.as_raw_fd(),
+                          &mut param as *mut _
+                                     as *mut libc::c_void
+                                     as *mut u8) as isize
+        }).chain_err(|| ErrorKind::AddIp)?;
+
         Ok(())
     }
 
@@ -118,43 +119,46 @@ impl Tun {
         let socket = unsafe { UdpSocket::from_raw_fd(
             libc::socket(libc::AF_INET6, libc::SOCK_DGRAM, 0)
         ) };
+
         let mut param = ffi::ifreq {
             name: name,
             data: ffi::addr6_to_raw(ip),
         };
-        let ret = unsafe {
+        ffi::check_ret(unsafe {
             ffi::add_ip(socket.as_raw_fd(),
-                        &mut param as *mut _ as *mut libc::c_void as *mut u8)
-        };
-        if ret < 0 {
-            Err(io::Error::last_os_error()).chain_err(|| ErrorKind::AddIp)?;
-        }
+                          &mut param as *mut _
+                                     as *mut libc::c_void
+                                     as *mut u8) as isize
+        }).chain_err(|| ErrorKind::AddIp)?;
+
         let mut param = ffi::ifreq {
             name: name,
             data: ffi::addr6_to_raw(mask),
         };
-        let ret = unsafe {
+        ffi::check_ret(unsafe {
             ffi::add_mask(socket.as_raw_fd(),
-                          &mut param as *mut _ as *mut libc::c_void as *mut u8)
-        };
-        if ret < 0 {
-            Err(io::Error::last_os_error()).chain_err(|| ErrorKind::AddIp)?;
-        }
+                          &mut param as *mut _
+                                     as *mut libc::c_void
+                                     as *mut u8) as isize
+        }).chain_err(|| ErrorKind::AddIp)?;
+
         Ok(())
     }
 
     pub fn set_up(name: [i8; 16]) -> Result<()> {
         let socket = UdpSocket::bind("0.0.0.0:6555").chain_err(|| ErrorKind::AddIp)?;
+
         let mut param = ffi::ifreq {
             name: name,
             data: ffi::IFF_UP | ffi::IFF_RUNNING,
         };
-        let ret = unsafe {
-            ffi::set_flags(socket.as_raw_fd(), &mut param as *mut _ as *mut libc::c_void as *mut u8)
-        };
-        if ret < 0 {
-            Err(io::Error::last_os_error()).chain_err(|| ErrorKind::AddIp)?;
-        }
+        ffi::check_ret(unsafe {
+            ffi::set_flags(socket.as_raw_fd(),
+                           &mut param as *mut _
+                                      as *mut libc::c_void
+                                      as *mut u8) as isize
+        }).chain_err(|| ErrorKind::AddIp)?;
+
         Ok(())
     }
 }
@@ -184,12 +188,7 @@ impl Io for Tun {
 }
 
 fn set_nonblock(s: &AsRawFd) -> io::Result<()> {
-    let ret = unsafe {
-        libc::fcntl(s.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK)
-    };
-    if ret < 0 {
-        Err(io::Error::last_os_error())
-    } else {
-        Ok(())
-    }
+    ffi::check_ret(unsafe {
+        libc::fcntl(s.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK) as isize
+    }).map(|_| ())
 }

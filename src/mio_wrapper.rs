@@ -5,6 +5,8 @@ use libc::{self, c_void};
 use mio::{Poll, Token, Ready, PollOpt, Evented};
 use mio::unix::EventedFd;
 
+use ffi;
+
 pub struct Tun(RawFd);
 pub struct Tap(RawFd);
 
@@ -79,31 +81,21 @@ impl Drop for Tap {
 
 impl io::Read for Tun {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let ret = unsafe {
+        ffi::check_ret(unsafe {
             libc::read(self.0,
                        buf.as_mut_ptr() as *mut c_void,
                        buf.len())
-        };
-        if ret < 0 {
-            Err(io::Error::last_os_error())
-        } else {
-            Ok(ret as usize)
-        }
+        })
     }
 }
 
 impl io::Write for Tun {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let ret = unsafe {
+        ffi::check_ret(unsafe {
             libc::write(self.0,
                         buf.as_ptr() as *const c_void,
                         buf.len())
-        };
-        if ret < 0 {
-            Err(io::Error::last_os_error())
-        } else {
-            Ok(ret as usize)
-        }
+        })
     }
     fn flush(&mut self) -> io::Result<()> {
         Ok(())

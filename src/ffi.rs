@@ -1,4 +1,5 @@
 use std::net::*;
+use std::io;
 
 use libc;
 
@@ -71,5 +72,13 @@ pub fn addr6_to_raw(addr: Ipv6Addr) -> libc::sockaddr_in6 {
         sin6_port: 0,
         sin6_flowinfo: 0,
         sin6_scope_id: 0,
+    }
+}
+
+pub fn check_ret(ret: libc::ssize_t) -> io::Result<usize> {
+    if ret < 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(ret as usize)
     }
 }
