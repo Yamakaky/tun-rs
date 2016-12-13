@@ -31,8 +31,8 @@ error_chain! {
 }
 
 pub struct Tun {
-    // TODO(tailhook) Why we need a name here?
-    pub name: Option<String>,
+    // Used in ifreq for ioctl.
+    _name: Option<String>,
     inner: PollEvented<mio_wrapper::Tun>,
 }
 
@@ -75,7 +75,7 @@ impl Tun {
         let mio = unsafe { mio_wrapper::Tun::from_raw_fd(tun.into_raw_fd()) };
         let inner = PollEvented::new(mio,handle).chain_err(|| ErrorKind::Create)?;
         Ok(Tun {
-            name: name,
+            _name: name,
             inner: inner,
         })
     }
