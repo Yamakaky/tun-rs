@@ -12,3 +12,6 @@ ioctl = "0.3"
 libc = "0.2"
 tokio-core = "0.1"
 mio = "0.6.1"
+
+[dev-dependencies]
+pnet = "0.14"

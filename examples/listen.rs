@@ -5,6 +5,9 @@ extern crate mio;
 #[macro_use]
 extern crate tokio_core;
 extern crate tun;
+extern crate pnet;
+
+use pnet::packet::FromPacket;
 
 use std::io::Read;
 
@@ -32,7 +35,20 @@ impl futures::Future for Server {
         loop {
             let mut buf = [0; 1500];
             let nb_bytes = try_nb!(self.tun.read(&mut buf));
-            println!("Received {} bytes", nb_bytes);
+            print!("Received {} bytes: ", nb_bytes);
+            match (buf[2], buf[3]) {
+                (0x08, 0x00) => {
+                    let packet = pnet::packet::ipv4::Ipv4Packet::new(&buf[4..nb_bytes]).unwrap().from_packet();
+                    println!("{:?}", packet);
+                }
+                (0x86, 0xdd) => {
+                    let packet = pnet::packet::ipv6::Ipv6Packet::new(&buf[4..nb_bytes]).unwrap().from_packet();
+                    println!("{:?}", packet);
+                }
+                (a, b) => {
+                    println!("Unknown protocol ({:0>2x}{:0>2x}): {:?}", a, b, &buf[..nb_bytes]);
+                }
+            }
         }
     }
 }
